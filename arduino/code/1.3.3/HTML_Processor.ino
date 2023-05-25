@@ -77,6 +77,22 @@ String processor(const String& var)
   if(var == "soil_humidity"){
     return String(soil_humidity_percent);
   }
+  if(var == "soil_humidity_max"){
+    return String(soil_humidity_max);
+  }
+  if(var == "arrosage_semaine"){
+    return String(eeprom_arrosage_semaine);
+  }
+
+  if(var == "Jeedom_url"){
+    return String(eeprom_Jeedom_Url);
+  }
+  if(var == "Jeedom_apikey"){
+    return String(eeprom_Jeedom_Apikey);
+  }
+  if(var == "Jeedom_ID_Humidity"){
+    return String(eeprom_Jeedom_ID_Humidity);
+  }
   
   if(var == "bus_voltage"){
     return String(bus_voltage);
