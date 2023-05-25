@@ -1,8 +1,9 @@
 config.html
 firmware.html
 index.html
+jeedom.html
 script.js
 sensors.html
+settings.html
 style.css
 wifi.html
-settings.html

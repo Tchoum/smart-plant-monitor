@@ -2,37 +2,37 @@
   <head>
     <link href="style.css" rel="stylesheet" type="text/css">
     <title>SMART PLANT SETTINGS</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
   </head>
   <body>
   <canvas id="canvas"></canvas>
     <div>
     <form action="/settings" method="POST">
-      <a href="/">HOME</a> | <a href="/wifi">WIFI</a> | <a href="/config">CONFIG HA</a> | <a href="/sensors">SENSORS</a>
+      <a href="/">HOME</a> | <a href="/wifi">WIFI</a> | <a href="/config">CONFIG HA</a>
+      <br /><a href="/jeedom">CONFIG JEEDOM</a> | <a href="/sensors">SENSORS</a>
       <br><a href="/settings">SETTINGS</a> | <a href="/firmware">FIRMWARE</a>
       <h1>SETTINGS</h1>
       <br>
-	  <br>
-	  <br>
       <b>
         <label for="url">Update Interval: <span id="value"></span> min</label>
         <br>
       </b>
 
       <input type="range" min="1" max="120" value="%update_interval_default%" class="slider" id="update_interval" name="update_interval" required>
-      <br>
-      <br>
-	  <br>
-      <br>
-      
-      <br>
-      
       <br><br>
-      <br>
-      <br>
-      <br>
+      <b>
+        <label for="soil_humidity_max">Soil Humidity Max:</label>
+        <br>
+      </b>
+      <input type="text" name="soil_humidity_max" value="%soil_humidity_max%" required>
       <br><br>
-      <input type="submit" value="Submit">
+      <b>
+        <label for="arrosage_semaine">Arrosage semaine (0=Désactivé):</label>
+        <br>
+      </b>
+      <input type="number" name="arrosage_semaine" value="%arrosage_semaine%" >
+      <br><br>
+      <input class="btn" type="submit" value="Submit">
       <br>
     </form>
 	</div>

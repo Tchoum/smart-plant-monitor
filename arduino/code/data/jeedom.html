@@ -7,31 +7,31 @@
   <body>
   <canvas id="canvas"></canvas>
     <div>
-    <form action="/config" method="POST">
+    <form action="/jeedom" method="POST">
       <a href="/">HOME</a> | <a href="/wifi">WIFI</a> | <a href="/config">CONFIG HA</a>
       <br /><a href="/jeedom">CONFIG JEEDOM</a> | <a href="/sensors">SENSORS</a>
       <br><a href="/settings">SETTINGS</a> | <a href="/firmware">FIRMWARE</a>
-      <h1>CONFIG HA</h1>
+      <h1>Config Jeedom</h1>
       <br>
       <b>
-        <label for="url">Home Assistant URL:</label>
+        <label for="Jeedom_url">Jeedom URL(IP):</label>
         <br>
       </b>
-      <input type="text" name="url" required>
-      <br>
+      <input type="text" name="Jeedom_url" value="%Jeedom_url%" required>
       <br>
       <b>
-        <label for="api">Home Assistant Token:</label>
+        <label for="Jeedom_api">Jeedom Apikey:</label>
         <br>
       </b>
-      <input type="text" name="api" required>
+      <input type="text" name="Jeedom_api" value="%Jeedom_apikey%" required>
+      <br >
+      <b>
+        <label for="Jeedom_ID_Humidity">Jeedom ID Humidity:</label>
+        <br>
+      </b>
+      <input type="text" name="Jeedom_ID_Humidity" value="%Jeedom_ID_Humidity%" required>
       <br>
-      
-      <br><br><b><label for="url">Connection Status:</label></b>
-      <br>
-      <br>%connection_status%
-      <br>
-      <br><br>
+      <br />
       <input class="btn" type="submit" value="Submit">
       <br>
     </form>
