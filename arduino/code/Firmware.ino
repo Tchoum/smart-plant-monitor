@@ -20,7 +20,13 @@ int check_version(){
     Serial.print(" (Own version: ");
     Serial.print(own_version);
     Serial.println(")");
-    if(own_version != server_version){
+
+    String server_version_int = server_version;
+    server_version_int.replace(".","");
+    String own_version_int = own_version;
+    own_version_int.replace(".","");
+    
+    if(own_version_int.toInt() < server_version_int.toInt()){
       Serial.println("  Update required");
       firmware_status = "UPDATE REQUIRED";
       http.end();

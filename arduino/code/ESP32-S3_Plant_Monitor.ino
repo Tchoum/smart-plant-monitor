@@ -78,7 +78,7 @@ float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741;
 // ---------- THERMISTOR ---------- //
 
 // ---------- VERSION ---------- //
-String own_version="1.4.0";
+String own_version="1.4.1";
 String server_version="N/A";
 int update_code = 0;
 int firmware_code = 0;
@@ -140,6 +140,7 @@ int wifi_timeout = 10000; //Measured in mS
 int http_timeout = 10000; //Measured in mS
 unsigned long loop_time = 0;
 int boot_mode_delay = 3000;
+int force_ap_mode_delay = 6000;
 int reset_delay = 10000;
 // ---------- TIMEOUTS ---------- //
 
@@ -187,6 +188,7 @@ uint16_t Jeedom_ID_Humidity = 0;
 // ---------- OTHER ---------- //
 bool restarting = false;
 bool boot_into_config = false; 
+bool force_ap_mode = false;
 bool reset_complete = false;
 bool board_check = false;
 bool home_assistant_connection = false;
@@ -225,8 +227,6 @@ void setup(void)
   digitalWrite(external_led_pin, HIGH);
   delay(200);
   digitalWrite(external_led_pin, LOW);
-
-  battery_voltage = get_battery_voltage();
   
   String mac = WiFi.macAddress();
   hostname = "SMARTPLANT" + mac.substring(mac.length()-5, mac.length()-3) + mac.substring(mac.length()-2, mac.length());
@@ -321,6 +321,17 @@ void setup(void)
       digitalWrite(external_led_pin, LOW);
       delay(100);
       boot_into_config = true;
+    }
+    if(millis() > loop_time + force_ap_mode_delay && force_ap_mode == false){
+      digitalWrite(external_led_pin, HIGH);
+      delay(100);
+      digitalWrite(external_led_pin, LOW);
+      delay(100);
+      digitalWrite(external_led_pin, HIGH);
+      delay(100);
+      digitalWrite(external_led_pin, LOW);
+      delay(100);
+      force_ap_mode = true;
     }
     if(millis() > loop_time + reset_delay){
       
@@ -466,22 +477,23 @@ void setup(void)
   //char* mdns = (char*)malloc(mdns_string.length() + 1);
   //mdns_string.toCharArray(mdns, mdns_string.length()+1);
 
-  
-  WiFi.setHostname(hostname.c_str());
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.println("*** Connecting WIFI ***");
-  Serial.print("  ");
-  
-  loop_time = millis();
-  if(String(ssid) != ""){
-    while (WiFi.status() != WL_CONNECTED && millis() < loop_time + wifi_timeout) {
-      delay(1000);
-      Serial.print(".");
+    WiFi.setHostname(hostname.c_str());
+  if(force_ap_mode == false){
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+    Serial.println("*** Connecting WIFI ***");
+    Serial.print("  ");
+    
+    loop_time = millis();
+    if(String(ssid) != ""){
+      while (WiFi.status() != WL_CONNECTED && millis() < loop_time + wifi_timeout) {
+        delay(1000);
+        Serial.print(".");
+      }
     }
+    Serial.println();
   }
-  Serial.println();
-
+  
   if(WiFi.status() != WL_CONNECTED) {
     Serial.println("FAILED!");
     wifi_status = false;
@@ -523,6 +535,21 @@ void setup(void)
     Serial.println("Error setting up MDNS responder!");
   }
   MDNS.addService("http", "tcp", 80);
+
+  //Ini display for both normal and confniguration mode.
+  //display.init(115200); // enable diagnostic output on Serial
+  display.init(); // disable diagnostic output on Serial
+  
+  display.setTextColor(GxEPD_BLACK);
+  display.fillScreen(GxEPD_WHITE);
+  display.setRotation(0);
+  // draw background
+  display.drawExampleBitmap(layout, 0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, GxEPD_BLACK);
+  display.setFont(&FreeMonoBold12pt7b);
+  // partial update to full screen to preset for partial update of box window
+  // (this avoids strange background effects)
+  //display.drawExampleBitmap(layout, sizeof(layout), GxEPD::bm_default | GxEPD::bm_partial_update);
+  display.setRotation(3);
 
   if(boot_into_config == true){
     Serial.println("*** CONFIG MODE ***");
@@ -733,6 +760,8 @@ void setup(void)
       deep_sleep_time = (eeprom_update_interval.toFloat()) * 1000000; //Measured in uS
       Serial.print("Deep Sleep Time: ");
       Serial.println(deep_sleep_time);
+      Serial.print("soil Humidity max: ");
+      Serial.println(eeprom_soil_humidity_max);
       Serial.print("Arrosage semaine: ");
       Serial.println(eeprom_arrosage_semaine);
       
@@ -769,26 +798,30 @@ void setup(void)
       }
       request->send(SPIFFS, "/firmware.html", String(), false, processor);  
       
-
-      
     });
-  }else if(boot_into_config == false){
+
+    //Display screen configuration
+    display.fillRect(0, 0, 200, 46, GxEPD_WHITE);
+    display.setCursor(5, 28);
+    display.println("Configuration");
+    display.setCursor(0, 70);
+    display.println(WiFi.getHostname());
+    display.setFont(&FreeMonoBold9pt7b);
+    if(wifi_status){
+      display.print("Wifi:");
+      display.println(ssid);
+      display.print("IP:");
+      display.println(WiFi.localIP());
+    } else {
+      display.println("==== AP MODE! ====");
+      display.print("IP:");
+      display.println(WiFi.softAPIP());
+    }
     
-    //display.init(115200); // enable diagnostic output on Serial
-    display.init(); // disable diagnostic output on Serial
-    
-    display.setTextColor(GxEPD_BLACK);
-    //display.fillScreen(GxEPD_WHITE);
-    display.setRotation(0);
-    // draw background
-    display.drawExampleBitmap(layout, 0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, GxEPD_BLACK);
-    //display.update();
     display.setFont(&FreeMonoBold12pt7b);
-    // partial update to full screen to preset for partial update of box window
-    // (this avoids strange background effects)
-    //display.drawExampleBitmap(layout, sizeof(layout), GxEPD::bm_default | GxEPD::bm_partial_update);
-    display.setRotation(3);
-    
+    display_update_date_time();
+    display.updateWindow(0, 0, 200, 200, true);
+
   }
 
  
@@ -808,8 +841,6 @@ void loop()
   air_humidity = aht_humidity.relative_humidity;
   air_temperature = aht_temperature.temperature;
   
-  //battery_percent = 0;
-  //battery_voltage = get_battery_voltage();
 
   if (ltr.newDataAvailable()) {
     valid = ltr.readBothChannels(ambient_light, ir_light);
@@ -892,6 +923,11 @@ void loop()
       esp_deep_sleep_start();
     
   } else {
+    if(rtc.getTime("%S").toInt() == 0) {
+      display.fillRect(0, 170, 200, 20, GxEPD_WHITE);
+      display_update_date_time();
+      display.updateWindow(0, 170, 200, 20, true);
+    }
     first_boot = false;
     delay(1000);
   }
