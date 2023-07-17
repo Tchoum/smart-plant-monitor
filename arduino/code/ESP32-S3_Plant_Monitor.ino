@@ -76,7 +76,7 @@ float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741;
 // ---------- THERMISTOR ---------- //
 
 // ---------- VERSION ---------- //
-String own_version="1.4.3";
+String own_version="1.4.4";
 String server_version="N/A";
 int update_code = 0;
 int firmware_code = 0;
@@ -114,10 +114,11 @@ uint8_t eeprom_arrosage_semaine = 0;
 
 
 // ---------- SENSORS ---------- //
-uint16_t soil_humidity_max = 400; //800
+uint16_t soil_humidity_max = 800;
 uint8_t soil_humidity_min = 70;
 float soil_face_value = 0;
 float soil_back_value = 0;
+float soilHumidity = 0;
 RTC_DATA_ATTR float soilHumidityPercent = 0;
 RTC_DATA_ATTR float soil_humidity_percent = 0;
 float soil_temperature = 0;
@@ -395,7 +396,7 @@ void setup(void)
   eeprom_password = EEPROM.readString(64);
   Serial.print("  PASS: ");
   //Serial.println(eeprom_password);
-  Serial.println("****");
+  Serial.println("*****");
   eeprom_apiKey = EEPROM.readString(128);
   Serial.print("  API: ");
   Serial.println(eeprom_apiKey);
@@ -420,7 +421,18 @@ void setup(void)
   Serial.print("  Jeedom ID Humidité: ");
   Serial.println(eeprom_Jeedom_ID_Humidity);
   eeprom_soil_humidity_max = EEPROM.readUShort(914);
-  if (eeprom_soil_humidity_max >= 2500 || eeprom_soil_humidity_max == 0) {
+  /*
+  //Fixé la valeur, en attendant d'avoir une meilleur solution pour l'adaptation auto
+  if (eeprom_soil_humidity_max != soil_humidity_max){  
+      EEPROM.writeUShort(914, soil_humidity_max);
+      if(EEPROM.commit()){
+        Serial.print("Soil humidity max fixée à : ");
+        Serial.println(soil_humidity_max);
+      }
+    }
+   //####################################
+   */
+  if (eeprom_soil_humidity_max > 2000 || eeprom_soil_humidity_max == 0) {
     EEPROM.writeUShort(914, soil_humidity_max);
     if(EEPROM.commit()) Serial.print("  New");
   } else {
@@ -453,7 +465,7 @@ void setup(void)
   Serial.println(ssid);
   Serial.print("  PASS: ");
   //Serial.println(password);
-  Serial.println("***");
+  Serial.println("*****");
   Serial.print("  API: ");
   Serial.println(apiKey);
   Serial.print("  URL: ");
@@ -799,7 +811,6 @@ void setup(void)
     });
 
     //Display screen configuration
-    //display.firstPage();
     do{
       display.setRotation(3);
       display.fillRect(0, 0, 200, 46, GxEPD_WHITE);
@@ -990,8 +1001,8 @@ float get_soil_humidity(){
   soil_back_value = touchRead(back_pin) / 1000;
   //Test de plausibilité de la mesure
   float soil_diff = soil_face_value - soil_back_value;
-  if(soil_diff < 500 && soil_diff > -500){
-    float soilHumidity = (soil_face_value + soil_back_value) / 2;
+  if(soil_diff < 400 && soil_diff > -400){
+    soilHumidity = (soil_face_value + soil_back_value) / 2;
 
     eeprom_soil_humidity_max = EEPROM.readUShort(914);
     Serial.print("Soil humidity: ");
@@ -1000,7 +1011,7 @@ float get_soil_humidity(){
     Serial.print(eeprom_soil_humidity_max);
     Serial.print(", Max-Actuel: ");
     Serial.println(soil_humidity_max);
-    if (soilHumidity > soil_humidity_max + 5) {
+    /*if (soilHumidity > soil_humidity_max + 5) {
       soil_humidity_max = soilHumidity;
       if (soil_humidity_max < 400) soil_humidity_max = 400;
       EEPROM.writeUShort(914, soil_humidity_max);
@@ -1009,11 +1020,18 @@ float get_soil_humidity(){
         Serial.print("Soil humidity max augmenté: ");
         Serial.println(soil_humidity_max);
       }
-    }
-    soilHumidityPercent = map(soilHumidity,soil_humidity_min,soil_humidity_max,0,100);
+    }*/
+    
   } else {
     Serial.println("Plausibilité mesure pas OK!");
+    Serial.println("plus petite valeur utilisé!");
+    if(soil_face_value < soil_back_value){
+      soilHumidity = soil_face_value;
+    } else {
+      soilHumidity = soil_back_value;
+    }
   }
+  soilHumidityPercent = map(soilHumidity,soil_humidity_min,soil_humidity_max,0,100);
   
   if(soilHumidityPercent < 0){
     soilHumidityPercent = 0;
