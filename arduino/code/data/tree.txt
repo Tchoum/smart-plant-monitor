@@ -7,3 +7,4 @@ sensors.html
 settings.html
 style.css
 wifi.html
+zone.json
