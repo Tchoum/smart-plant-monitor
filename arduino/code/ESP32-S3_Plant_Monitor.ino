@@ -290,7 +290,6 @@ void setup(void)
   } else {
     Serial.println("NOK!");
   }
-  //delay(100);
 
   loop_time = millis();
   
@@ -480,7 +479,6 @@ void setup(void)
   if(force_ap_mode == false){
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
-    //delay(100);
     Serial.println("*** Connecting WIFI ***");
     Serial.print("  ");
 
