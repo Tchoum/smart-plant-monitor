@@ -83,6 +83,9 @@ String processor(const String& var)
   if(var == "arrosage_semaine"){
     return String(eeprom_arrosage_semaine);
   }
+  if(var == "timezone"){
+    return String(eeprom_timezone);
+  }
 
   if(var == "Jeedom_url"){
     return String(eeprom_Jeedom_Url);
