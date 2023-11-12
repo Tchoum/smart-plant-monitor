@@ -14,10 +14,9 @@
       <h1>SETTINGS</h1>
       <br>
       <b>
-        <label for="url">Update Interval: <span id="value"></span> min</label>
+        <label for="update_interval">Update Interval: <span id="value"></span> min</label>
         <br>
       </b>
-
       <input type="range" min="1" max="120" value="%update_interval_default%" class="slider" id="update_interval" name="update_interval" required>
       <br><br>
       <b>
@@ -31,6 +30,41 @@
         <br>
       </b>
       <input type="number" name="arrosage_semaine" value="%arrosage_semaine%" >
+      <br><br>
+      <b>
+        <label for="timezone">Time zone:</label>
+        <br>
+      </b>
+      <select id="timezone" name="timezone">
+        <option value="">-</option>
+      </select>
+      <script type="text/javascript">
+        timezone = "%timezone%"
+        let dropdown = document.getElementById('timezone');
+        dropdown.length = 0;
+
+        const url = 'zone.json';
+
+        fetch(url)
+        .then(
+          function(response) {
+            response.json().then(function(data) {
+              let option;
+              const text = Object.keys(data);
+              const value = Object.values(data)
+              for (let i = 0; i < text.length; i++) {
+                option = document.createElement('option');
+                option.text = text[i];
+                option.value = value[i];
+                if (timezone == value[i]) {
+                  option.selected = true;
+                }
+                dropdown.add(option);
+              }
+          })
+
+        });
+      </script>
       <br><br>
       <input class="btn" type="submit" value="Submit">
       <br>
