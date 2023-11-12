@@ -9,15 +9,12 @@
 #include <GxEPD2.h>
 #include <GxEPD2_BW.h>
 #include <U8g2_for_Adafruit_GFX.h>
-
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <HTTPClient.h>
 #include <ESPmDNS.h>
 #include <ESP32httpUpdate.h>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
 #include <ESP32Time.h>
 #include "SPIFFS.h"
 #include "EEPROM.h"
@@ -76,7 +73,7 @@ float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741;
 // ---------- THERMISTOR ---------- //
 
 // ---------- VERSION ---------- //
-String own_version="1.4.4";
+String own_version="1.4.5";
 String server_version="N/A";
 int update_code = 0;
 int firmware_code = 0;
@@ -99,7 +96,7 @@ String wifi_networks = "<option value=\"SCANNING\">SCANNING</option>"; //Initial
 // ---------- WIFI ---------- //
 
 // ---------- EEPROM ---------- //
-#define EEPROM_SIZE            917 //SSID=64, PASS=64, APIKEY=256, URL=256, Interval = 16, Jeedom_apikey = 128, Jeedom_url = 128, Jeedom_ID_Humidite = 2, soil_humidity_max = 2, arrosage_semaine = 1
+#define EEPROM_SIZE            949 //SSID=64, PASS=64, APIKEY=256, URL=256, Interval = 16, Jeedom_apikey = 128, Jeedom_url = 128, Jeedom_ID_Humidite = 2, soil_humidity_max = 2, arrosage_semaine = 1, timezone = 32
 String eeprom_ssid = "";
 String eeprom_password = "";
 String eeprom_apiKey = ""; 
@@ -110,6 +107,7 @@ String eeprom_Jeedom_Url = "";
 uint16_t eeprom_Jeedom_ID_Humidity = 0;
 uint16_t eeprom_soil_humidity_max = 0;
 uint8_t eeprom_arrosage_semaine = 0;
+String eeprom_timezone = "";
 // ---------- EEPROM ---------- //
 
 
@@ -135,7 +133,7 @@ bool valid;
 
 // ---------- TIMEOUTS ---------- //
 float deep_sleep_time = 1800e6; //Measured in uS
-int wifi_timeout = 10000; //Measured in mS
+int wifi_timeout = 15000; //Measured in mS
 int http_timeout = 10000; //Measured in mS
 unsigned long loop_time = 0;
 int boot_mode_delay = 3000;
@@ -145,15 +143,9 @@ int reset_delay = 10000;
 
 
 // ---------- TIME ---------- //
-const long utcOffsetInSeconds = 7200;
-unsigned long rtcOffset = 0;
-unsigned long seconds = 0;
-unsigned long minutes = 0;
-unsigned long hours = 0;
-unsigned long days = 0;
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "0.ch.pool.ntp.org", utcOffsetInSeconds);
+const long daylightOffset_sec = 3600;
+const String timezone_default = "CET-1CEST,M3.5.0,M10.5.0/3";  //Voir fichier data/zone.json
+char* TimeZone = (char*)malloc(32);
 // ---------- TIME ---------- //
 
 // ---------- HOMEASSISTANT ---------- //
@@ -282,7 +274,6 @@ void setup(void)
     Serial.print("  Thresholds: "); Serial.print(ltr.getLowThreshold()); Serial.print(" & "); Serial.println(ltr.getHighThreshold());
   }
 
-  
   Serial.print("AHT Begin: ");
   if(aht.begin()){
     Serial.println("OK");
@@ -294,13 +285,12 @@ void setup(void)
   }
 
   Serial.print("EEPROM Begin: ");
-  bool eeprom_begin = EEPROM.begin(EEPROM_SIZE);
-  delay(1000);
-  if(eeprom_begin) {
+  if(EEPROM.begin(EEPROM_SIZE)) {
     Serial.println("OK");
   } else {
     Serial.println("NOK!");
   }
+  //delay(100);
 
   loop_time = millis();
   
@@ -333,9 +323,9 @@ void setup(void)
       force_ap_mode = true;
     }
     if(millis() > loop_time + reset_delay){
-      
-      ssid = "";
-      password = "";
+
+      ssid = (char*)malloc(64);
+      password = (char*)malloc(64);
       apiKey = ""; 
       home_assistant_url = ""; 
       jeedom_ApiKey = "";
@@ -349,7 +339,8 @@ void setup(void)
           addr += 1;
       }
       EEPROM.writeString(640, eeprom_update_interval);
-      EEPROM.writeUShort(928, soil_humidity_max);
+      EEPROM.writeUShort(914, soil_humidity_max);
+      EEPROM.writeString(917, timezone_default);
       
       if(EEPROM.commit()){
         digitalWrite(external_led_pin, HIGH);
@@ -388,6 +379,7 @@ void setup(void)
   eeprom_Jeedom_ID_Humidity = 0;
   eeprom_update_interval = ""; 
   eeprom_soil_humidity_max = 0;
+  eeprom_timezone = "";
   Serial.println("*** READING EEPROM ***");
   
   eeprom_ssid = EEPROM.readString(0);
@@ -421,17 +413,7 @@ void setup(void)
   Serial.print("  Jeedom ID Humidité: ");
   Serial.println(eeprom_Jeedom_ID_Humidity);
   eeprom_soil_humidity_max = EEPROM.readUShort(914);
-  /*
-  //Fixé la valeur, en attendant d'avoir une meilleur solution pour l'adaptation auto
-  if (eeprom_soil_humidity_max != soil_humidity_max){  
-      EEPROM.writeUShort(914, soil_humidity_max);
-      if(EEPROM.commit()){
-        Serial.print("Soil humidity max fixée à : ");
-        Serial.println(soil_humidity_max);
-      }
-    }
-   //####################################
-   */
+  
   if (eeprom_soil_humidity_max > 2000 || eeprom_soil_humidity_max == 0) {
     EEPROM.writeUShort(914, soil_humidity_max);
     if(EEPROM.commit()) Serial.print("  New");
@@ -443,9 +425,12 @@ void setup(void)
   eeprom_arrosage_semaine = EEPROM.read(916);
   Serial.print("  Arrosage semaine: ");
   Serial.println(eeprom_arrosage_semaine);
+  eeprom_timezone = EEPROM.readString(917);
+  Serial.print("  Timezone: ");
+  Serial.println(eeprom_timezone);
+  
   Serial.println("*** EEPROM READ COMPLETE***");
 
-  
   eeprom_ssid.toCharArray(ssid, eeprom_ssid.length()+1);
   eeprom_password.toCharArray(password, eeprom_password.length()+1);
   
@@ -455,6 +440,8 @@ void setup(void)
   jeedom_ApiKey = String(eeprom_Jeedom_Apikey);
   Jeedom_Url = String(eeprom_Jeedom_Url);
   Jeedom_ID_Humidity = eeprom_Jeedom_ID_Humidity;
+
+  eeprom_timezone.toCharArray(TimeZone, eeprom_timezone.length()+1);
 
   deep_sleep_time = (eeprom_update_interval.toFloat()) * 1000000; //Measured in uS
   if(deep_sleep_time == 0){
@@ -482,14 +469,21 @@ void setup(void)
   Serial.println(soil_humidity_max);
   Serial.print("  Update Interval: ");
   Serial.println(deep_sleep_time);
+  Serial.print("  timezone: ");
+  if (TimeZone == "") {
+    timezone_default.toCharArray(TimeZone, timezone_default.length()+1);
+    Serial.print("Defaulted to: ");
+  }
+  Serial.println(TimeZone);
 
   WiFi.setHostname(hostname.c_str());
   if(force_ap_mode == false){
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
+    //delay(100);
     Serial.println("*** Connecting WIFI ***");
     Serial.print("  ");
-    
+
     loop_time = millis();
     if(String(ssid) != ""){
       while (WiFi.status() != WL_CONNECTED && millis() < loop_time + wifi_timeout) {
@@ -519,14 +513,19 @@ void setup(void)
     Serial.println(WiFi.localIP());
 
     // ----- Get Time ----- //
+    configTime(0, daylightOffset_sec, "0.ch.pool.ntp.org");
+    setenv("TZ", TimeZone, 1);
+    tzset();
+    struct tm timeinfo;
     Serial.print("NTP: ");
-    timeClient.begin();
-    if (timeClient.update()) {
-      rtc.setTime(timeClient.getEpochTime());
-      rtcOffset = millis();
-      Serial.println("OK");
-    }else{
+    if(!getLocalTime(&timeinfo)){
       Serial.println("Failed");
+      delay(100);
+      getLocalTime(&timeinfo);
+    } else {
+      Serial.println("OK");
+      Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S zone %Z %z ");
+      rtc.setTimeStruct(timeinfo);
     }
     // ----- Get Time ----- //
     
@@ -574,6 +573,10 @@ void setup(void)
   
     server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request){
       request->send(SPIFFS, "/script.js", "text/javascript");
+    });
+    
+    server.on("/zone.json", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(SPIFFS, "/zone.json", "application/json");
     });
   
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -756,6 +759,9 @@ void setup(void)
                 if (eeprom_arrosage_semaine <= 0) eeprom_arrosage_semaine = 0;
                 if (eeprom_arrosage_semaine >= 7) eeprom_arrosage_semaine = 7;
               }
+              if (p->name() == "timezone") {
+                eeprom_timezone = p->value().c_str();
+              }
             }
           }
           
@@ -772,10 +778,13 @@ void setup(void)
       Serial.println(eeprom_soil_humidity_max);
       Serial.print("Arrosage semaine: ");
       Serial.println(eeprom_arrosage_semaine);
+      Serial.print("Time Zone: ");
+      Serial.println(eeprom_timezone);
       
       EEPROM.writeString(640, eeprom_update_interval); 
       EEPROM.writeUShort(914, eeprom_soil_humidity_max);
       EEPROM.write(916, eeprom_arrosage_semaine);
+      EEPROM.writeString(917, eeprom_timezone); 
        
       if(EEPROM.commit()){
         config_saved_eeprom = true;
@@ -787,7 +796,7 @@ void setup(void)
       soil_humidity_percent = get_soil_humidity();
       display_update_capacitance_config();
     });
-  
+
     server.on("/firmware", HTTP_GET, [](AsyncWebServerRequest *request){
       update_code = check_version();
       if(update_code==1){
@@ -847,12 +856,10 @@ void loop()
     ESP.restart();
   }
   
-  
   sensors_event_t aht_humidity, aht_temperature;
   aht.getEvent(&aht_humidity, &aht_temperature);// populate temp and humidity objects with fresh data
   air_humidity = aht_humidity.relative_humidity;
   air_temperature = aht_temperature.temperature;
-  
 
   if (ltr.newDataAvailable()) {
     valid = ltr.readBothChannels(ambient_light, ir_light);
@@ -874,7 +881,6 @@ void loop()
   board_check = check_board();
 
   if(boot_into_config == false){
-
     if(wifi_status == true){
       if(Jeedom_ID_Humidity != 0 && first_boot == false){
         Send_Jeedom(Jeedom_ID_Humidity, soil_humidity_percent);
@@ -1011,16 +1017,6 @@ float get_soil_humidity(){
     Serial.print(eeprom_soil_humidity_max);
     Serial.print(", Max-Actuel: ");
     Serial.println(soil_humidity_max);
-    /*if (soilHumidity > soil_humidity_max + 5) {
-      soil_humidity_max = soilHumidity;
-      if (soil_humidity_max < 400) soil_humidity_max = 400;
-      EEPROM.writeUShort(914, soil_humidity_max);
-      
-      if(EEPROM.commit()){
-        Serial.print("Soil humidity max augmenté: ");
-        Serial.println(soil_humidity_max);
-      }
-    }*/
     
   } else {
     Serial.println("Plausibilité mesure pas OK!");
@@ -1050,7 +1046,6 @@ float get_soil_humidity(){
 }
 
 float get_thermistor(){
-
   float thermistorAverage = 0;
   
   for (int i=0; i<10; i++){
@@ -1064,11 +1059,9 @@ float get_thermistor(){
   }
   thermistorAverage = thermistorAverage / 10;
   return thermistorAverage;
-
 }
 
 float get_pcb_thermistor(){
- 
   float thermistorAverage = 0;
   
   for (int i=0; i<10; i++){
@@ -1082,7 +1075,6 @@ float get_pcb_thermistor(){
   }
   thermistorAverage = thermistorAverage / 10;
   return thermistorAverage;
-  
 }
 
 
@@ -1093,6 +1085,7 @@ void display_update_temperature(){
   uint16_t box_h = 40;
   uint16_t cursor_y = box_y + 16;
   uint16_t cursor_y_2 = cursor_y + 24;
+  
   display.setRotation(3);
   display.setPartialWindow(box_x, box_y, box_w, box_h);
   u8g2Fonts.setFont(u8g2_font_helvR14_tf);
@@ -1109,13 +1102,13 @@ void display_update_temperature(){
 }
 
 void display_update_battery(){
-  
   uint16_t box_x = 64;
   uint16_t box_y = 0;
   uint16_t box_w = 72;
   uint16_t box_h = 40;
   uint16_t cursor_y = box_y + 16;
   uint16_t cursor_y_2 = cursor_y + 24;
+  
   display.setRotation(3);
   display.setPartialWindow(box_x, box_y, box_w, box_h);
   u8g2Fonts.setFont(u8g2_font_helvR14_tf);
@@ -1165,6 +1158,7 @@ void display_update_humidity(){
   uint16_t box_h = 40;
   uint16_t cursor_y = box_y + 16;
   uint16_t cursor_y_2 = cursor_y + 24;
+  
   display.setRotation(3);
   display.setPartialWindow(box_x, box_y, box_w, box_h);
   u8g2Fonts.setFont(u8g2_font_helvR14_tf);
@@ -1441,7 +1435,5 @@ float get_sleep_home_assistant(){
       return 0;
   }
   
-  
   return state_int;
-
 }
