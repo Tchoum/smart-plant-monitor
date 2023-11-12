@@ -133,7 +133,7 @@ bool valid;
 
 // ---------- TIMEOUTS ---------- //
 float deep_sleep_time = 1800e6; //Measured in uS
-int wifi_timeout = 15000; //Measured in mS
+int wifi_timeout = 10000; //Measured in mS
 int http_timeout = 10000; //Measured in mS
 unsigned long loop_time = 0;
 int boot_mode_delay = 3000;
